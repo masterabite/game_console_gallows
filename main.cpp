@@ -3,6 +3,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 using namespace std;
 
@@ -13,8 +14,22 @@ struct word_hint {
 	string hint;	//подсказка
 };
 
+//структура игрока
+struct player {
+	string name;
+	int score;
+};
+
+//функция сравнения двух игроков для сортировки таблицы рекордов
+bool players_cmp(player p1, player p2) {
+	return p1.score > p2.score;
+}
+
 //структура игры
 struct game {
+	//имя для таблицы рекордов
+	player curPlayer;
+	vector<player> players;
 	string word;				//текущее слово, которое видит игрок игрока
 	vector <word_hint> words;	//базовый массив слов с подсказками
 	string mistakes;			//кол-во ошибок игрока
@@ -24,13 +39,15 @@ struct game {
 		words = vector<word_hint>();
 		word = "";
 		mistakes = "";
-		loadFromFile("words_hints.txt");
+		curPlayer.score = 0;
+		cout << "Введите имя: "; cin >> curPlayer.name;
+		loadFromFiles();
 	}
 
 	//функция считывает из файла все базовые слова и подсказки
-	void loadFromFile(string fname) {
+	void loadFromFiles() {
 		words.clear();						//очищаем базовый массив слов и подсказок
-		ifstream fin(fname);				//пытаемся открыть файл с указанным названием
+		ifstream fin("words_hints.txt");	//пытаемся открыть файл с указанным названием
 		word_hint temp;						//буферная переменная для заполнения базового массива слов с подсказками
 		if (fin.is_open()) {				//если удалось открыть файл
 			while (!fin.eof()) {			//пока не конец файла
@@ -39,6 +56,29 @@ struct game {
 				getline(fin, temp.hint);	//далее считываем до конца строки позсказку
 				words.push_back(temp);		//добавляем данные в базу
 			}
+		}
+		fin.close();
+
+		//аналогично заполняем таблицу рекордов
+		players.clear();
+		ifstream finr("records.in");			
+		player player_temp;					
+		if (finr.is_open()) {				
+			while (!finr.eof()) {			
+				finr >> player_temp.name;	
+				if (finr.eof()) break;
+				finr >> player_temp.score;	
+				players.push_back(player_temp);	//добавляем данные в базу
+			}
+		}
+		finr.close();
+	}
+
+	void saveRecords() {
+		ofstream fout("records.in");
+
+		for (player p : players) {
+			fout << p.name << ' ' << p.score << '\n';
 		}
 	}
 
@@ -53,7 +93,17 @@ struct game {
 		if (m == 5)				cout << "             /\n"; else
 		if (m == 6)				cout << "             / \\\n"; else cout << '\n';
 								cout << '\n';
+	}
 
+	void printRecords() {
+		cout << "\n\tТаблица рекордов\n";
+		printf("+----------------+--------+\n");
+		printf("|%16s|%8s|\n", "Имя", "Счёт");
+		printf("+----------------+--------+\n");
+		for (player p : players) {
+			printf("|%16s|%8d|\n", p.name.c_str(), p.score);
+			printf("+----------------+--------+\n");
+		}
 	}
 
 	//функция вывода состояния игры для слова с индексом i из базы, с учетом уровня сложности
@@ -144,6 +194,7 @@ struct game {
 			//если игрок совершает 6 ошибок, то он проиграл
 			if (mistakes.size() == 6) {
 				cout << "Вы проиграли!\n";
+				printGallows(6);
 				cout << "Загаданное слово: " << words[ind].word;
 				break;
 			}
@@ -151,11 +202,17 @@ struct game {
 			//игрок победил, если в слове win не осталось пустых букв _
 			if (word.find('_') == string::npos) {
 				cout << "Вы выйграли!\n";
-				cout << "Загаданное слово: " << words[ind].word;
+				cout << "Загаданное слово: " << words[ind].word << '\n';
+				cout << "Ошибкок: " << mistakes.size() << '\n';
+				curPlayer.score = (6-mistakes.size()) * lvl;	//подсчёт очков
+				players.push_back(curPlayer);
+				sort(players.begin(), players.end(), players_cmp);
 				break;
 			}
 		}
-		
+
+		printRecords();
+		saveRecords();
 	}
 };
 
@@ -163,7 +220,7 @@ int main() {
 	//устанавливаем кодировку для кириллицы
 	SetConsoleCP(1251);
 	SetConsoleOutputCP(1251);
-	
+
 	//создаем игру и запускаем ее
 	game g;
 	g.play();
